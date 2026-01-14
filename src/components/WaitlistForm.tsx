@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowRight, CheckCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const WaitlistForm = () => {
   const [email, setEmail] = useState("");
@@ -19,12 +20,21 @@ const WaitlistForm = () => {
 
     setIsSubmitting(true);
     
-    // Simulate form submission - replace with actual endpoint
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    
-    setIsSubmitting(false);
-    setIsSubmitted(true);
-    toast.success("You're on the list! We'll be in touch soon.");
+    try {
+      const { data, error } = await supabase.functions.invoke("send-waitlist-email", {
+        body: { email },
+      });
+
+      if (error) throw error;
+
+      setIsSubmitted(true);
+      toast.success("You're on the list! We'll be in touch soon.");
+    } catch (error: any) {
+      console.error("Waitlist submission error:", error);
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
