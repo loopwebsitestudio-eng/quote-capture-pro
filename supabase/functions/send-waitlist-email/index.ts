@@ -1,7 +1,4 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { Resend } from "https://esm.sh/resend@2.0.0";
-
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,7 +6,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const NOTIFICATION_EMAIL = "loopwebsitestudio@gmail.com";
+const GOOGLE_SHEETS_WEBHOOK = Deno.env.get("GOOGLE_SHEETS_WEBHOOK");
 
 interface WaitlistRequest {
   email: string;
@@ -30,19 +27,21 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    const emailResponse = await resend.emails.send({
-      from: "Loop Quote Waitlist <onboarding@resend.dev>",
-      to: [NOTIFICATION_EMAIL],
-      subject: "New Waitlist Signup!",
-      html: `
-        <h1>New Waitlist Signup</h1>
-        <p>Someone just joined your Loop Quote waitlist:</p>
-        <p><strong>Email:</strong> ${email}</p>
-        <p>Time: ${new Date().toLocaleString()}</p>
-      `,
+    if (!GOOGLE_SHEETS_WEBHOOK) {
+      console.error("GOOGLE_SHEETS_WEBHOOK not configured");
+      return new Response(
+        JSON.stringify({ error: "Webhook not configured" }),
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    const response = await fetch(GOOGLE_SHEETS_WEBHOOK, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, timestamp: new Date().toISOString() }),
     });
 
-    console.log("Waitlist notification sent:", emailResponse);
+    console.log("Google Sheets response:", response.status);
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
