@@ -5,15 +5,27 @@ import { ArrowRight, CheckCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
+// Email validation regex (RFC 5322 simplified)
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MAX_EMAIL_LENGTH = 254;
+
+function isValidEmail(email: string): boolean {
+  if (!email || typeof email !== "string") return false;
+  if (email.length > MAX_EMAIL_LENGTH) return false;
+  return EMAIL_REGEX.test(email.trim());
+}
+
 const WaitlistForm = () => {
   const [email, setEmail] = useState("");
+  const [honeypot, setHoneypot] = useState(""); // Hidden field for bot detection
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email || !email.includes("@")) {
+    // Proper email validation
+    if (!isValidEmail(email)) {
       toast.error("Please enter a valid email address");
       return;
     }
@@ -22,7 +34,7 @@ const WaitlistForm = () => {
     
     try {
       const { data, error } = await supabase.functions.invoke("send-waitlist-email", {
-        body: { email },
+        body: { email: email.trim().toLowerCase(), honeypot },
       });
 
       if (error) throw error;
@@ -30,7 +42,7 @@ const WaitlistForm = () => {
       setIsSubmitted(true);
       toast.success("You're on the list! We'll be in touch soon.");
     } catch (error: any) {
-      console.error("Waitlist submission error:", error);
+      // Don't log sensitive form data
       toast.error("Something went wrong. Please try again.");
     } finally {
       setIsSubmitting(false);
@@ -51,11 +63,23 @@ const WaitlistForm = () => {
               </p>
               
               <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+                {/* Honeypot field - hidden from users, catches bots */}
+                <input
+                  type="text"
+                  name="website"
+                  value={honeypot}
+                  onChange={(e) => setHoneypot(e.target.value)}
+                  className="absolute -left-[9999px] opacity-0 pointer-events-none"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  aria-hidden="true"
+                />
                 <Input
                   type="email"
                   placeholder="Enter your work email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  maxLength={254}
                   className="h-12 bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground placeholder:text-primary-foreground/50 focus:border-accent focus:ring-accent"
                   disabled={isSubmitting}
                 />
